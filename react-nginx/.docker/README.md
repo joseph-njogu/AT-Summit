@@ -1,4 +1,4 @@
-## Compose sample application at AT Su,,it
+## Compose sample application at AT Summit
 
 ### Use with Docker Development Environments
 
@@ -10,7 +10,7 @@ You can open this sample in the Dev Environments feature of Docker Desktop versi
 
 Project structure:
 
-```
+```ß
 ├── compose.yaml
 ├── Dockerfile
 ├── .dockerignore
