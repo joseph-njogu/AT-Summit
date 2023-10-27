@@ -1,0 +1,104 @@
+---
+- name: Deployment of GCP instance
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Create file
+      copy:
+        content: Create \n
+        dest: /tmp/test.txt
+
+    - name: increase no. of open files
+      sysctl:
+         name: fs.file-max
+         value: '500000'
+         state: present
+      become: true
+
+#installing necessary pakages before installing docker
+    - name: Install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+      become: true
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      become: true
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+      become: true
+
+    - name:  Install Docker and Docker-Compose
+      apt: 
+        pkg: 
+          - docker
+          - docker-ce
+          - docker-compose
+        state: latest
+        update_cache: yes
+      become: true
+    - name: Running docker without root and add it to user groups
+      shell: |
+        usermod -aG docker $USER
+      become: true
+## **END**
+
+
+    - name: Recursively change ownership of a directory
+      file:
+        path:  /home/elephant/Remote/
+        state: directory
+        recurse: yes
+        owner: elephant
+      become: true
+    - name: Scan the host keys
+      shell: |
+        ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+    - name: Pull project from github
+      git:
+        key_file: "~/.ssh/id_rsa"
+        repo: 'github_url'
+        dest: /home/elephant/Remote/
+        version: main
+        update: yes
+        force: yes
+        accept_hostkey: yes
+    - name: Copy environmental variables to the server
+      copy:
+        src: .env
+        dest: /home/elephant/Remote/
+      become: true
+    - name: set docker log to 10MB size with max of 5 files
+      copy:
+        content: |  
+           {
+             "log-driver": "json-file",
+             "log-opts": {
+               "max-size": "10m",
+               "max-file": "5" 
+              }
+            }
+        dest: "/etc/docker/daemon.json"
+      become: true
+      
+    - name: Restart Docker service 
+      service:
+        name: docker
+        state: restarted
+      become: true
+#Build docker container and force remove the subsequent containers
+    - name: Build a  container
+      shell: docker-compose -f /home/elephant/Remote/docker-compose.yml build --force-rm
+      become: true
+#run docker container in detached mode
+    - name: start container
+      shell: | 
+        cd /home/elephant/Remote/
+        docker-compose -f /home/elephant/Remote/compose.yml up -d 
+      become: true
